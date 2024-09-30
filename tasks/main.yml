@@ -1,0 +1,69 @@
+---
+
+
+    - name: Install various packages with dnf
+      dnf:
+        name:
+          - perl-interpreter
+          - kernel-devel-{{ target_kernel }}
+          - kernel-headers-{{ target_kernel }}
+          - kernel-core-{{ target_kernel }}
+          - gcc
+          - perl-File-Find
+          - perl-File-Copy
+          - perl-File-Compare
+          - perl-sigtrap
+          - libtool
+          - rpm-build
+          - kernel-srpm-macros
+          - patch
+          - lsof
+          - autoconf
+          - automake
+          - pciutils
+          - kernel-rpm-macros
+          - gcc-gfortran
+          - tcl
+          - tk
+          - libusbx
+          - libnl3
+          - fuse-libs
+          - ethtool
+          - numactl-libs
+        state: present
+
+    - name: Download mofed source to /tmp/ directory
+      get_url:
+        url: "{{ mofed_build_tgz_url }}"
+        dest: "/tmp/"
+        mode: '0644'
+
+    - name: Extract the .tgz file to /root directory
+      unarchive:
+        src: "/tmp/{{ mofed_build_tgz }}"
+        dest: "/root/"
+        remote_src: yes
+        mode: '0755'
+
+        
+    - name: Run the mlnxofedinstall script with required options
+      command: >
+        ./mlnxofedinstall
+        --add-kernel-support-build-only
+        --without-fw-update
+        --force
+        --skip-repo
+        -q
+        --kernel {{ target_kernel }}
+        --kernel-sources /lib/modules/{{ target_kernel }}/build/
+      args:
+        chdir: "{{ mofed_build_folder }}"
+      environment:
+        TERM: vt100
+
+    - name: Set mofed_build_target_folder and mofed_build_target_tgz in role
+      set_fact:
+        mofed_build_target_folder: "{{ mofed_build_target_folder }}"
+        mofed_build_target_tgz:    "{{ mofed_build_target_tgz }}"
+        cacheable: yes  # Make the fact persistent across plays
+      tags: send_to_repo
