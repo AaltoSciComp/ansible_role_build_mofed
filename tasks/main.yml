@@ -1,69 +1,181 @@
 ---
 
 
-    - name: Install various packages with dnf
+    - name: Install the specified version of kernel packages with dnf
       dnf:
         name:
-          - perl-interpreter
+          - python3-dnf-plugin-versionlock
           - kernel-devel-{{ target_kernel }}
           - kernel-headers-{{ target_kernel }}
           - kernel-core-{{ target_kernel }}
-          - gcc
-          - perl-File-Find
-          - perl-File-Copy
-          - perl-File-Compare
-          - perl-sigtrap
-          - libtool
-          - rpm-build
-          - kernel-srpm-macros
-          - patch
-          - lsof
-          - autoconf
-          - automake
-          - pciutils
-          - kernel-rpm-macros
-          - gcc-gfortran
-          - tcl
-          - tk
-          - libusbx
-          - libnl3
-          - fuse-libs
-          - ethtool
-          - numactl-libs
         state: present
 
-    - name: Download mofed source to /tmp/ directory
-      get_url:
-        url: "{{ mofed_build_tgz_url }}"
-        dest: "/tmp/"
-        mode: '0644'
-
-    - name: Extract the .tgz file to /root directory
-      unarchive:
-        src: "/tmp/{{ mofed_build_tgz }}"
-        dest: "/root/"
-        remote_src: yes
-        mode: '0755'
-
+    - name: Prevent kernel packages from being updated
+      community.general.dnf_versionlock:
+        name:
+          - kernel-devel-{{ target_kernel }}
+          - kernel-headers-{{ target_kernel }}
+          - kernel-core-{{ target_kernel }}
+        state: present
         
-    - name: Run the mlnxofedinstall script with required options
+
+        # https://developer.nvidia.com/doca-downloads?deployment_platform=Host-Server&deployment_package=DOCA-Host&target_os=Linux&Architecture=x86_64&Profile=doca-ofed&Distribution=RHEL&version=9.5&installer_type=rpm_online
+        # DOCA Extra Package and doca-kernel-support
+        
+    - name: Add DOCA repository
+      ansible.builtin.yum_repository:
+        name: doca
+        description: DOCA Online Repo
+        baseurl: "https://linux.mellanox.com/public/repo/doca/{{ mofed_doca_version }}/{{ mofed_distro }}/x86_64/"
+        enabled: yes
+        gpgcheck: no
+
+    - name: Install the doca-extra kernel package
+      dnf:
+        name:
+          - doca-extra
+        state: present
+
+    - name: Run the doca-kernel-support script with required options (creates the doca-kernel-repo*.rpm)
       command: >
-        ./mlnxofedinstall
-        --add-kernel-support-build-only
-        --without-fw-update
-        --force
-        --skip-repo
-        -q
+        /opt/mellanox/doca/tools/doca-kernel-support
         --kernel {{ target_kernel }}
-        --kernel-sources /lib/modules/{{ target_kernel }}/build/
-      args:
-        chdir: "{{ mofed_build_folder }}"
-      environment:
-        TERM: vt100
+      register: doca_ks_output
+
+    - name: Extract the package name
+      set_fact:
+        mofed_doca_kernel_rpm: "{{ doca_ks_output.stdout |  regex_search('rpm -ivh ([a-zA-Z0-9.\\-_/]+)', '\\1') }}"
+
+    - name: Print the extracted package name
+      debug:
+        msg: "Extracted package name: {{ mofed_doca_kernel_rpm[-1] }}"
+
+    - name: Install the doca-kernel-repo*.rpm kernel package
+      dnf:
+        name:
+          - "{{ mofed_doca_kernel_rpm[-1] }}"
+        state: present
+        disable_gpg_check: true
+
+    - name: Extract the version
+      set_fact:
+        mofed_some_version: "{{ doca_ks_output.stdout |  regex_search('rpm -ivh (.+)doca-kernel-repo-([0-9.]+)-(.+).rpm', '\\2') | regex_replace('([^.]+\\.[^.]+)\\.(.*)', '\\1-\\2') }}"
+
+    - name: Print the extracted version
+      debug:
+        msg: "Extracted version: {{ mofed_some_version[-1] }}"
+
 
     - name: Set mofed_build_target_folder and mofed_build_target_tgz in role
       set_fact:
-        mofed_build_target_folder: "{{ mofed_build_target_folder }}"
+        mofed_build_target_folder: "/usr/share/doca-host-{{ mofed_some_version[-1] }}/Modules/{{ target_kernel }}/"
         mofed_build_target_tgz:    "{{ mofed_build_target_tgz }}"
         cacheable: yes  # Make the fact persistent across plays
-      tags: send_to_repo
+
+    - name: Find all .rpm files in the target folder
+      find:
+        paths: "{{ mofed_build_target_folder }}"
+        patterns: "*.rpm"
+      register: rpm_files
+
+    - name: Print the list of .rpm files
+      debug:
+        msg: "{{ rpm_files }}"
+
+    - name: Print the destination tgz file
+      debug:
+        msg: "{{ mofed_build_target_folder }}/{{ mofed_build_target_tgz }}"
+
+
+    - name: Archive all .rpm files
+      archive:
+        path: "{{ rpm_files.files | map(attribute='path') | join(',') }}"
+        dest: "{{ mofed_build_target_folder }}/{{ mofed_build_target_tgz }}"
+        format: gz
+      when: rpm_files.matched > 0
+
+
+#dnf install kernel-devel-5.14.0-503.14.1.el9_5 kernel-headers-5.14.0-503.14.1.el9_5  kernel-core-5.14.0-503.14.1.el9_5
+#python3-dnf-plugin-versionlock
+#dnf versionlock add kernel-headers-5.14.0-503.14.1.el9_5
+#dnf versionlock add kernel-devel-5.14.0-503.14.1.el9_5
+#dnf versionlock add kernel-core-5.14.0-503.14.1.el9_5
+#
+#echo "[doca]
+#name=DOCA Online Repo
+#baseurl=https://linux.mellanox.com/public/repo/doca/2.9.1/rhel9.5/x86_64/
+#enabled=1
+#gpgcheck=0" > /etc/yum.repos.d/doca.repo
+#
+#dnf install doca-extra
+#/opt/mellanox/doca/tools/doca-kernel-support
+#/opt/mellanox/doca/tools/doca-kernel-support --kernel 5.14.0-503.14.1.el9_5.x86_64
+
+
+
+#  rpm -ivh /tmp/DOCA.LFo64SbHtx/doca-kernel-repo-24.10.1.1.4.0-1.kver.5.14.0.503.14.1.el9.5.x86.64.x86_64.rpm
+
+#After installing the package, doca-kernel-5.14.0.503.14.1.el9.5.x86.64 metapackage should be available.
+
+#Next steps could probably be:
+#  dnf makecache
+#
+#Then, install ofed packages (e.g. doca-all, doca-ofed).
+
+# list contents
+#rpm -qlp /tmp/DOCA.LFo64SbHtx/doca-kernel-repo-24.10.1.1.4.0-1.kver.5.14.0.503.14.1.el9.5.x86.64.x86_64.rpm
+
+
+# After installation:
+#
+#[root@641f59c65e3f /]# cat /etc/yum.repos.d/doca-kernel-5.14.0-503.14.1.el9_5.x86_64.repo 
+#[doca-kernel-5.14.0-503.14.1.el9_5.x86_64]
+#name=DOCA kernel (kernel 5.14.0-503.14.1.el9_5.x86_64)
+#baseurl=file:///usr/share/doca-host-24.10-1.1.4.0/Modules/5.14.0-503.14.1.el9_5.x86_64
+#enabled=1
+#gpgcheck=0
+
+
+
+
+
+# Skip the old MOFED
+    - name: old mofed
+      when: false
+      block:
+
+      - name: Download mofed source to /tmp/ directory
+        get_url:
+          url: "{{ mofed_build_tgz_url }}"
+          dest: "/tmp/"
+          mode: '0644'
+
+      - name: Extract the .tgz file to /root directory
+        unarchive:
+          src: "/tmp/{{ mofed_build_tgz }}"
+          dest: "/root/"
+          remote_src: yes
+          mode: '0755'
+
+
+      - name: Run the mlnxofedinstall script with required options
+        command: >
+          ./mlnxofedinstall
+          --add-kernel-support-build-only
+          --without-fw-update
+          --force
+          --skip-repo
+          -q
+          --kernel {{ target_kernel }}
+          --kernel-sources /lib/modules/{{ target_kernel }}/build/
+        args:
+          chdir: "{{ mofed_build_folder }}"
+        environment:
+          TERM: vt100
+
+      - name: Set mofed_build_target_folder and mofed_build_target_tgz in role
+        set_fact:
+          mofed_build_target_folder: "{{ mofed_build_target_folder }}"
+          mofed_build_target_tgz:    "{{ mofed_build_target_tgz }}"
+          cacheable: yes  # Make the fact persistent across plays
+        tags: send_to_repo

@@ -1,8 +1,10 @@
 target_kernel: 5.14.0-427.35.1
 
-mofed_build_tgz_ver : 24.07-0.6.1.0
-mofed_build_tgz :                "MLNX_OFED_LINUX-{{ mofed_build_tgz_ver }}-rhel9.4-x86_64.tgz"
-mofed_build_tgz_url :  "https://content.mellanox.com/ofed/MLNX_OFED-{{ mofed_build_tgz_ver }}/{{ mofed_build_tgz }}"
-mofed_build_folder :       "/root/MLNX_OFED_LINUX-{{ mofed_build_tgz_ver }}-rhel9.4-x86_64/"
-mofed_build_target_folder : "/tmp/MLNX_OFED_LINUX-{{ mofed_build_tgz_ver }}-{{ target_kernel }}"
-mofed_build_target_tgz :         "MLNX_OFED_LINUX-{{ mofed_build_tgz_ver }}-rhel9.4-ext.tgz"
+mofed_distro: "rhel9.4"
+#mofed_build_tgz_ver : 24.07-0.6.1.0
+mofed_doca_version: 2.9.1
+mofed_build_tgz :                "DOCA_MLNX_OFED_LINUX-{{ mofed_doca_version }}-{{ mofed_distro }}-x86_64.tgz"
+#mofed_build_tgz_url :  "https://content.mellanox.com/ofed/MLNX_OFED-{{ mofed_build_tgz_ver }}/{{ mofed_build_tgz }}"
+#mofed_build_folder :       "/root/MLNX_OFED_LINUX-{{ mofed_build_tgz_ver }}-{{ mofed_distro }}-x86_64/"
+#mofed_build_target_folder : "/tmp/MLNX_OFED_LINUX-{{ mofed_build_tgz_ver }}-{{ target_kernel }}"
+mofed_build_target_tgz :         "MLNX_OFED_LINUX-{{ mofed_doca_version }}-{{ mofed_distro }}.tgz"
