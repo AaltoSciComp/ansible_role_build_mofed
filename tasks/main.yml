@@ -81,10 +81,12 @@
     - name: Print the list of .rpm files
       debug:
         msg: "{{ rpm_files }}"
+        verbosity: 1
 
     - name: Print the destination tgz file
       debug:
         msg: "{{ mofed_build_target_folder }}/{{ mofed_build_target_tgz }}"
+        verbosity: 1
 
 
     - name: Archive all .rpm files
@@ -95,87 +97,3 @@
       when: rpm_files.matched > 0
 
 
-#dnf install kernel-devel-5.14.0-503.14.1.el9_5 kernel-headers-5.14.0-503.14.1.el9_5  kernel-core-5.14.0-503.14.1.el9_5
-#python3-dnf-plugin-versionlock
-#dnf versionlock add kernel-headers-5.14.0-503.14.1.el9_5
-#dnf versionlock add kernel-devel-5.14.0-503.14.1.el9_5
-#dnf versionlock add kernel-core-5.14.0-503.14.1.el9_5
-#
-#echo "[doca]
-#name=DOCA Online Repo
-#baseurl=https://linux.mellanox.com/public/repo/doca/2.9.1/rhel9.5/x86_64/
-#enabled=1
-#gpgcheck=0" > /etc/yum.repos.d/doca.repo
-#
-#dnf install doca-extra
-#/opt/mellanox/doca/tools/doca-kernel-support
-#/opt/mellanox/doca/tools/doca-kernel-support --kernel 5.14.0-503.14.1.el9_5.x86_64
-
-
-
-#  rpm -ivh /tmp/DOCA.LFo64SbHtx/doca-kernel-repo-24.10.1.1.4.0-1.kver.5.14.0.503.14.1.el9.5.x86.64.x86_64.rpm
-
-#After installing the package, doca-kernel-5.14.0.503.14.1.el9.5.x86.64 metapackage should be available.
-
-#Next steps could probably be:
-#  dnf makecache
-#
-#Then, install ofed packages (e.g. doca-all, doca-ofed).
-
-# list contents
-#rpm -qlp /tmp/DOCA.LFo64SbHtx/doca-kernel-repo-24.10.1.1.4.0-1.kver.5.14.0.503.14.1.el9.5.x86.64.x86_64.rpm
-
-
-# After installation:
-#
-#[root@641f59c65e3f /]# cat /etc/yum.repos.d/doca-kernel-5.14.0-503.14.1.el9_5.x86_64.repo 
-#[doca-kernel-5.14.0-503.14.1.el9_5.x86_64]
-#name=DOCA kernel (kernel 5.14.0-503.14.1.el9_5.x86_64)
-#baseurl=file:///usr/share/doca-host-24.10-1.1.4.0/Modules/5.14.0-503.14.1.el9_5.x86_64
-#enabled=1
-#gpgcheck=0
-
-
-
-
-
-# Skip the old MOFED
-    - name: old mofed
-      when: false
-      block:
-
-      - name: Download mofed source to /tmp/ directory
-        get_url:
-          url: "{{ mofed_build_tgz_url }}"
-          dest: "/tmp/"
-          mode: '0644'
-
-      - name: Extract the .tgz file to /root directory
-        unarchive:
-          src: "/tmp/{{ mofed_build_tgz }}"
-          dest: "/root/"
-          remote_src: yes
-          mode: '0755'
-
-
-      - name: Run the mlnxofedinstall script with required options
-        command: >
-          ./mlnxofedinstall
-          --add-kernel-support-build-only
-          --without-fw-update
-          --force
-          --skip-repo
-          -q
-          --kernel {{ target_kernel }}
-          --kernel-sources /lib/modules/{{ target_kernel }}/build/
-        args:
-          chdir: "{{ mofed_build_folder }}"
-        environment:
-          TERM: vt100
-
-      - name: Set mofed_build_target_folder and mofed_build_target_tgz in role
-        set_fact:
-          mofed_build_target_folder: "{{ mofed_build_target_folder }}"
-          mofed_build_target_tgz:    "{{ mofed_build_target_tgz }}"
-          cacheable: yes  # Make the fact persistent across plays
-        tags: send_to_repo
