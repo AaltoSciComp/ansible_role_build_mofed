@@ -17,11 +17,11 @@
           - kernel-headers-{{ target_kernel }}
           - kernel-core-{{ target_kernel }}
         state: present
-        
+
 
         # https://developer.nvidia.com/doca-downloads?deployment_platform=Host-Server&deployment_package=DOCA-Host&target_os=Linux&Architecture=x86_64&Profile=doca-ofed&Distribution=RHEL&version=9.5&installer_type=rpm_online
         # DOCA Extra Package and doca-kernel-support
-        
+
     - name: Add DOCA repository
       ansible.builtin.yum_repository:
         name: doca
@@ -44,11 +44,11 @@
 
     - name: Extract the package name
       set_fact:
-        mofed_doca_kernel_rpm: "{{ doca_ks_output.stdout |  regex_search('rpm -ivh ([a-zA-Z0-9.\\-_/]+)', '\\1') }}"
+        mofed_doca_kernel_rpm: "{{ doca_ks_output.stdout |  regex_search('rpm -[i|U]vh ([a-zA-Z0-9.\\-_/]+)', '\\1') }}"
 
     - name: Print the extracted package name
       debug:
-        msg: "Extracted package name: {{ mofed_doca_kernel_rpm[-1] }}"
+        msg: "Extracted package name: {{ mofed_doca_kernel_rpm }}"
 
     - name: Install the doca-kernel-repo*.rpm kernel package
       dnf:
@@ -59,7 +59,7 @@
 
     - name: Extract the version
       set_fact:
-        mofed_some_version: "{{ doca_ks_output.stdout |  regex_search('rpm -ivh (.+)doca-kernel-repo-([0-9.]+)-(.+).rpm', '\\2') | regex_replace('([^.]+\\.[^.]+)\\.(.*)', '\\1-\\2') }}"
+        mofed_some_version: "{{ doca_ks_output.stdout |  regex_search('rpm -[i|U]vh (.+)doca-kernel-repo-([0-9.]+)-(.+).rpm', '\\2') | regex_replace('([^.]+\\.[^.]+)\\.(.*)', '\\1-\\2') }}"
 
     - name: Print the extracted version
       debug:
