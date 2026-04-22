@@ -26,7 +26,7 @@
       ansible.builtin.yum_repository:
         name: doca
         description: DOCA Online Repo
-        baseurl: "https://linux.mellanox.com/public/repo/doca/{{ mofed_doca_version }}/{{ mofed_distro }}/x86_64/"
+        baseurl: "https://linux.mellanox.com/public/repo/doca/{{ mofed_doca_version }}/{{ mofed_distro }}/{{ mofed_arch }}/"
         enabled: yes
         gpgcheck: no
 
