@@ -92,7 +92,7 @@
     - name: Archive all .rpm files
       archive:
         path: "{{ rpm_files.files | map(attribute='path') | join(',') }}"
-        dest: "{{ mofed_build_target_folder }}/{{ mofed_build_target_tgz }}"
+        dest: "/tmp/{{ mofed_build_target_tgz }}"
         format: gz
       when: rpm_files.matched > 0
 
